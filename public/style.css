@@ -515,3 +515,20 @@ button.room:hover { border-color: var(--muted); }
 @keyframes pulse-border { 50% { border-color: var(--line); } }
 body.in-game .music-toggle span { display: none; }
 body.in-game .music-toggle.blocked span { display: inline; }
+
+/* ---------- 소리 설정 창 ---------- */
+.sound-panel {
+  position: fixed; left: 12px; bottom: 54px; z-index: 16; width: 240px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 10px 12px; display: grid; gap: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.sound-panel[hidden] { display: none; }
+.sound-row { display: grid; grid-template-columns: 64px 1fr 30px; align-items: center; gap: 8px; font-size: 13px; }
+.sound-row:first-child { grid-template-columns: 1fr auto; }
+.sound-row input[type="range"] { width: 100%; accent-color: var(--accent); padding: 0; border: 0; background: none; }
+.sound-row input:disabled { opacity: 0.4; }
+.sound-row output { font-family: var(--mono); font-size: 12px; color: var(--muted); text-align: right; }
+.switch { width: 38px; height: 22px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); position: relative; cursor: pointer; padding: 0; }
+.switch i { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--muted); transition: left 0.15s, background 0.15s; }
+.switch[aria-checked="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.switch[aria-checked="true"] i { left: 18px; background: var(--accent); }

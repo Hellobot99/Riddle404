@@ -985,22 +985,47 @@ function renderResult() {
   $('#btn-again').hidden = !state.me.isHost;
 }
 
-// ---------- 배경음악 버튼 ----------
+// ---------- 소리 설정 (왼쪽 아래 버튼 → 켜기/끄기, 배경음악·효과음 볼륨) ----------
 const musicBtn = $('#btn-music');
+const soundPanel = $('#sound-panel');
 function renderMusicBtn(status) {
-  musicBtn.setAttribute('aria-pressed', String(status !== 'off'));
   musicBtn.classList.toggle('off', status === 'off');
   musicBtn.classList.toggle('blocked', status === 'blocked');
-  musicBtn.querySelector('span').textContent = status === 'off' ? '음악 꺼짐' : status === 'blocked' ? '눌러서 음악 켜기' : '음악';
+  musicBtn.querySelector('span').textContent = status === 'off' ? '소리 꺼짐' : status === 'blocked' ? '눌러서 소리 켜기' : '소리';
+  $('#btn-sound-toggle').setAttribute('aria-checked', String(status !== 'off'));
+  for (const kind of ['music', 'sfx']) {
+    $(`#vol-${kind}`).value = window.Music.volume(kind);
+    $(`#vol-${kind}-out`).textContent = window.Music.volume(kind);
+    $(`#vol-${kind}`).disabled = status === 'off';
+  }
 }
 if (window.Music) {
   renderMusicBtn(window.Music.status());
   window.Music.onChange(renderMusicBtn);
   musicBtn.onclick = () => {
-    // 이 클릭으로 막 소리가 풀린 거라면 끄지 않는다
-    if (window.Music.status() === 'blocked' || window.Music.justUnlocked()) return renderMusicBtn(window.Music.status());
-    window.Music.toggle();
+    // 이 클릭으로 막 소리가 풀린 거라면 창은 열지 않는다
+    if (window.Music.justUnlocked()) return renderMusicBtn(window.Music.status());
+    soundPanel.hidden = !soundPanel.hidden;
+    musicBtn.setAttribute('aria-expanded', String(!soundPanel.hidden));
+    renderMusicBtn(window.Music.status());
   };
+  $('#btn-sound-toggle').onclick = () => window.Music.toggle();
+  for (const kind of ['music', 'sfx']) {
+    const input = $(`#vol-${kind}`);
+    input.oninput = () => {
+      window.Music.setVolume(kind, input.value);
+      $(`#vol-${kind}-out`).textContent = input.value;
+    };
+  }
+  // 효과음은 손을 뗄 때 한 번 들려준다
+  $('#vol-sfx').onchange = () => window.Music.preview();
+  // 창 밖을 누르면 닫는다
+  document.addEventListener('pointerdown', (e) => {
+    if (!soundPanel.hidden && !e.target.closest('#sound-panel, #btn-music')) {
+      soundPanel.hidden = true;
+      musicBtn.setAttribute('aria-expanded', 'false');
+    }
+  });
 } else {
   musicBtn.hidden = true;
 }

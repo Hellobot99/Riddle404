@@ -17,9 +17,17 @@
     result: 'audio/result.m4a', // 결과 화면에 들어설 때
     powerDown: 'audio/power_down.m4a', // 정전 기록이 공개될 때
   };
-  const VOLUME = 0.35; // 배경음악은 추리에 방해되지 않게 낮게
-  const SFX_VOLUME = 0.9;
+  // 볼륨 슬라이더(0~100) → 실제 음량. 배경음악은 추리에 방해되지 않게 최대치를 낮게 잡는다
+  const MUSIC_MAX = 0.7;
+  const SFX_MAX = 1;
   const DUCK = 0.35; // 효과음이 나는 동안 배경음악을 이만큼으로 낮춘다
+  const VOL_KEY = 'r404-volume';
+  const vol = (() => {
+    const fallback = { music: 50, sfx: 90 };
+    try { return { ...fallback, ...JSON.parse(localStorage.getItem(VOL_KEY) ?? '{}') }; } catch { return fallback; }
+  })();
+  const musicGain = () => (vol.music / 100) * MUSIC_MAX;
+  const sfxGain = () => (vol.sfx / 100) * SFX_MAX;
   const FADE = 1.2; // 곡 전환 시간(초)
 
   const STORE_KEY = 'r404-music';
@@ -104,7 +112,7 @@
     master.gain.value = 1;
     master.connect(ctx.destination);
     musicBus = ctx.createGain();
-    musicBus.gain.value = VOLUME;
+    musicBus.gain.value = musicGain();
     musicBus.connect(master);
     ctx.onstatechange = notify;
     // 지금 곡을 먼저, 나머지는 뒤에서 미리 받아 둔다
@@ -146,12 +154,12 @@
     const src = ctx.createBufferSource();
     src.buffer = buffer;
     const gain = ctx.createGain();
-    gain.gain.value = SFX_VOLUME;
+    gain.gain.value = sfxGain();
     src.connect(gain).connect(master);
     const t = ctx.currentTime;
     musicBus.gain.cancelScheduledValues(t);
-    musicBus.gain.setTargetAtTime(VOLUME * DUCK, t, 0.05);
-    musicBus.gain.setTargetAtTime(VOLUME, t + buffer.duration, 0.3);
+    musicBus.gain.setTargetAtTime(musicGain() * DUCK, t, 0.05);
+    musicBus.gain.setTargetAtTime(musicGain(), t + buffer.duration, 0.3);
     src.start();
     return buffer.duration;
   }
@@ -184,6 +192,16 @@
       holdUntil = ctx.currentTime + Math.max(0, len - 0.3);
       setTimeout(apply, Math.max(0, len - 0.3) * 1000 + 50);
     },
+    // 볼륨(0~100). kind: 'music' 배경음악 | 'sfx' 효과음
+    volume: (kind) => vol[kind],
+    setVolume(kind, value) {
+      if (!(kind in vol)) return;
+      vol[kind] = Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+      try { localStorage.setItem(VOL_KEY, JSON.stringify(vol)); } catch {}
+      if (kind === 'music' && musicBus) musicBus.gain.setTargetAtTime(musicGain(), ctx.currentTime, 0.05);
+    },
+    // 효과음 볼륨을 맞출 때 들어 보라고 하나 튼다
+    preview: () => playSfx('replay'),
     isOn: () => enabled,
     toggle() {
       enabled = !enabled;
