@@ -1,0 +1,8 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# 배경음악 원본 (웹에서는 압축한 .m4a를 쓴다)
+public/audio/*.wav
