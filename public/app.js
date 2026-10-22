@@ -166,6 +166,12 @@ function playMusicFor(prev, s) {
   if (!window.Music) return;
   if (s.phase === 'result' && prev?.phase !== 'result') return window.Music.reveal(musicScene(s));
   window.Music.setScene(musicScene(s));
+  // 관측자 놓기·취소: 버튼을 누른 순간이 아니라 서버가 반영했을 때 (거절된 배치에는 소리가 나지 않게)
+  if (prev?.phase === 'plan' && s.phase === 'plan' && prev.loop === s.loop) {
+    const mine = (st) => st.placements.filter((p) => p.isMe).length;
+    if (mine(s) > mine(prev)) window.Music.ui('place');
+    else if (mine(s) < mine(prev)) window.Music.ui('unplace');
+  }
   const before = prev?.observations?.length ?? 0;
   const fresh = (s.observations ?? []).slice(before);
   if (prev?.observations && fresh.length) {
@@ -577,6 +583,7 @@ $('#map').addEventListener('click', (e) => {
   if (act) return cellAction(act, cell);
   selected = cell;
   pane = 'record';
+  window.Music?.ui('select');
   renderGame();
 });
 $('#timeline').addEventListener('click', (e) => {

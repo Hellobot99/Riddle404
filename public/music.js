@@ -143,6 +143,35 @@
   }
 
   // 효과음 하나를 튼다. 그동안 배경음악을 낮췄다가 되돌린다. 효과음 길이(초)를 돌려준다.
+  // 조작 효과음: 음원 없이 짧은 음을 합성한다. 배경음악은 낮추지 않고, 효과음 볼륨을 따른다.
+  // notes: [주파수(Hz), 시작(초), 길이(초)]
+  const UI = {
+    select: { type: 'triangle', level: 0.25, notes: [[1320, 0, 0.035]] },
+    place: { type: 'square', level: 0.12, notes: [[660, 0, 0.06], [990, 0.065, 0.09]] },
+    unplace: { type: 'square', level: 0.12, notes: [[880, 0, 0.06], [520, 0.065, 0.09]] },
+  };
+  function playUi(name) {
+    const sound = UI[name];
+    if (!sound || !enabled || !ctx || ctx.state !== 'running' || vol.sfx === 0) return;
+    const out = ctx.createGain();
+    out.gain.value = sfxGain() * sound.level;
+    out.connect(master);
+    const t0 = ctx.currentTime + 0.005;
+    for (const [freq, at, len] of sound.notes) {
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type = sound.type;
+      osc.frequency.value = freq;
+      // 딸깍 소리가 나지 않게 아주 짧게 올렸다가 내린다
+      env.gain.setValueAtTime(0, t0 + at);
+      env.gain.linearRampToValueAtTime(1, t0 + at + 0.005);
+      env.gain.exponentialRampToValueAtTime(0.001, t0 + at + len);
+      osc.connect(env).connect(out);
+      osc.start(t0 + at);
+      osc.stop(t0 + at + len + 0.02);
+    }
+  }
+
   async function playSfx(name) {
     if (!enabled || !ctx || ctx.state !== 'running') return 0;
     let buffer;
@@ -202,6 +231,8 @@
     },
     // 효과음 볼륨을 맞출 때 들어 보라고 하나 튼다
     preview: () => playSfx('replay'),
+    // 조작 효과음: 'select' 방 선택 | 'place' 관측자 놓기 | 'unplace' 관측자 취소
+    ui: (name) => playUi(name),
     isOn: () => enabled,
     toggle() {
       enabled = !enabled;
