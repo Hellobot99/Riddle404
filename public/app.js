@@ -581,12 +581,29 @@ function cellAction(act, cell) {
   }
 }
 
+// 같은 방을 빠르게 두 번 누르면 관측자를 놓는다 (내 관측자가 있으면 취소).
+// 한 번 누를 때마다 지도를 다시 그려서 브라우저 dblclick은 놓칠 수 있으므로 직접 판정한다.
+const DOUBLE_MS = 400;
+let lastRoomClick = { key: null, at: 0 };
+
 $('#map').addEventListener('click', (e) => {
   const btn = e.target.closest('button.room');
   if (!btn) return;
   const cell = { place: Number(btn.dataset.p), time: Number(btn.dataset.t) };
   const act = e.target.closest('[data-act]')?.dataset.act;
   if (act) return cellAction(act, cell);
+  const key = ck(cell.place, cell.time);
+  const now = performance.now();
+  const isDouble = lastRoomClick.key === key && now - lastRoomClick.at < DOUBLE_MS;
+  lastRoomClick = isDouble ? { key: null, at: 0 } : { key, at: now };
+  if (isDouble && state.phase === 'plan') {
+    const pl = state.placements.find((p) => p.place === cell.place && p.time === cell.time);
+    const me = myPlayer();
+    if (pl?.isMe) cellAction('unplace', cell);
+    else if (!pl && me.placed < me.quota) cellAction('place', cell);
+    else if (!pl) toast('이번 루프 관측자를 다 놓았어요.');
+    return;
+  }
   selected = cell;
   pane = 'record';
   window.Music?.ui('select');
@@ -687,7 +704,7 @@ function renderRecord() {
   const el = $('#pane-record');
   if (!selected) {
     el.innerHTML = `<div class="hint">
-      <p><b>방을 눌러</b> 기록을 보고 관측자를 놓으세요.</p>
+      <p><b>방을 눌러</b> 기록을 보고 관측자를 놓으세요. <b>두 번 누르면</b> 바로 놓아요(다시 두 번 누르면 취소).</p>
       <p class="muted small">아래 타임라인으로 시각을 바꿔요. 노란 시각이 범행 추정 시간대예요. 모두 <b>배치 확정</b>을 누르면 그 밤이 다시 재생돼요.</p>
     </div>`;
     return;

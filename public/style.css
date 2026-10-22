@@ -544,3 +544,5 @@ body.in-game .music-toggle.blocked span { display: inline; }
 .vote-bar[hidden] { display: none; }
 .event.motive { color: var(--accent); }
 .event.item .tag, .event.motive .tag { opacity: 0.8; }
+/* 방을 두 번 탭해도 화면이 확대되지 않게 */
+.room { touch-action: manipulation; user-select: none; -webkit-user-select: none; }
