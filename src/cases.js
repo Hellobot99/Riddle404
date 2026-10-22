@@ -90,9 +90,11 @@ function fallbackFlavor(s, map, names) {
 function choicesFor(s, flavor) {
   const evidence = s.events.map((e, i) => ({ e, item: flavor.eventItems[i] })).filter(({ e }) => e.kind === 'suspicious');
   const method = evidence.find(({ e }) => e.who === s.culprit).item;
-  const motive = flavor.motives[0].text;
+  // 동기 선택지에는 핵심어를 앞에 붙인다. 동기 단서 기록에 나온 낱말과 바로 이어 볼 수 있게
+  const label = (m) => `${String(m.key).trim()} — ${String(m.text).trim()}`;
+  const motive = label(flavor.motives[0]);
   return {
-    options: { methods: shuffled(evidence.map((x) => x.item)), motives: shuffled(flavor.motives.map((m) => m.text)) },
+    options: { methods: shuffled(evidence.map((x) => x.item)), motives: shuffled(flavor.motives.map(label)) },
     answer: { method, motive },
   };
 }

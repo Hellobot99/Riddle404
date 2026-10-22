@@ -213,12 +213,13 @@ function tryMake(adj, level, rand) {
     addEvent({ kind: 'suspicious', place: presence[who][time], time, who });
   }
 
-  // 동기 단서: 진짜 동기의 핵심어가 담긴 기록(쪽지, 통화 등). 범인이 범행 전후가 아닌 다른 시각에 있던 방에 둔다.
-  const motiveOptions = [...Array(TIMES).keys()]
-    .filter((t) => Math.abs(t - crimeTime) > 1 && !forged.has(t) && presence[culprit][t] !== SCENE && !used.has(cellKey(presence[culprit][t], t)));
-  if (!motiveOptions.length) return null;
-  const motiveTime = pick(rand, motiveOptions);
-  addEvent({ kind: 'motive', place: presence[culprit][motiveTime], time: motiveTime, who: null });
+  // 동기 단서: 진짜 동기의 핵심어가 담긴 기록(쪽지, 통화 등).
+  // 규칙을 공개한다: "범인이 범행 1시간 전이나 1시간 뒤에 있던 방에 남아 있다". 범인을 밝혀내면 동선을 따라가 찾을 수 있다.
+  // 하나를 놓치거나 교수가 가려도 찾을 수 있게, 둘 다 가능하면 두 곳에 둔다.
+  const motiveTimes = [crimeTime - 2, crimeTime + 2]
+    .filter((t) => t >= 0 && t < TIMES && !forged.has(t) && presence[culprit][t] !== SCENE && !used.has(cellKey(presence[culprit][t], t)));
+  if (!motiveTimes.length) return null;
+  for (const t of motiveTimes) addEvent({ kind: 'motive', place: presence[culprit][t], time: t, who: null });
 
   // 분위기용 기록: 추리와 상관없는 잡음
   for (let i = 0; i < 4; i++) {
@@ -271,7 +272,10 @@ export function validate(s) {
   if (s.events.some((e) => e.place === SCENE)) return fail('현장에 기록이 있음');
   const culpritEvidence = s.events.filter((e) => e.kind === 'suspicious' && e.who === s.culprit);
   if (culpritEvidence.length !== 1 || Math.abs(culpritEvidence[0].time - s.crimeTime) !== 1) return fail('범행 수단 증거가 없음');
-  if (s.events.filter((e) => e.kind === 'motive').length !== 1) return fail('동기 단서가 없음');
+  const motives = s.events.filter((e) => e.kind === 'motive');
+  if (!motives.length || motives.some((e) => Math.abs(e.time - s.crimeTime) !== 2 || e.place !== s.presence[s.culprit][e.time])) {
+    return fail('동기 단서가 범행 1시간 전후 범인의 방에 없음');
+  }
 
   // 범행 시각에 범인이 아닌 사람들이 너무 한곳에 몰리면 관측 한두 번에 끝나므로 흩어 놓는다
   const alibiPlaces = new Set(s.presence.filter((_, i) => i !== s.culprit).map((row) => row[s.crimeTime]));

@@ -17,6 +17,7 @@ const PORT = env('PORT', 3000);
 const BRIEF_SECONDS = env('BRIEF_SECONDS', 60);
 const PLAN_SECONDS = env('PLAN_SECONDS', 90);
 const VOTE_SECONDS = env('VOTE_SECONDS', 30);
+const REVIEW_SECONDS = env('REVIEW_SECONDS', 60); // 마지막 재생 뒤, 최종 고발 전에 기록을 정리하는 시간
 const ROOM_TTL_MS = 10 * 60 * 1000;
 const MAX_CHAT = 200;
 const CHAT_COOLDOWN_MS = 1200;
@@ -163,7 +164,12 @@ function viewFor(room, player) {
       present: o.present,
       ...(o.blackout && { blackout: true, count: o.count }),
       // clue: 현장 쪽 소리 기록인지. 진짜(time)와 가짜(decoy)를 구별하지 않고 똑같이 보낸다
-      events: o.events.map((i) => ({ text: f.eventTexts[i], clue: s.events[i].kind === 'time' || s.events[i].kind === 'decoy' })),
+      // tag: 물건 증거(item)와 동기 단서(motive)는 기록 패널에서 표시해 준다
+      events: o.events.map((i) => ({
+        text: f.eventTexts[i],
+        clue: s.events[i].kind === 'time' || s.events[i].kind === 'decoy',
+        tag: { suspicious: 'item', motive: 'motive' }[s.events[i].kind] ?? null,
+      })),
       ...((prof || ended) && { forged: o.forged }),
     })),
     votes: g.log.votes.map((v) => ({ kind: v.kind, loop: v.loop, decided: v.kind === 'unmask' ? null : v.decided })),
@@ -278,10 +284,19 @@ function endPlan(room) {
   revealLoop(g);
   system(room, `${loop}번째 재생 결과가 공개됐다.`);
   if (finished(g)) {
-    startVote(room, 'final', null);
+    beginReview(room);
   } else {
     beginPlan(room);
   }
+}
+
+// 최종 검토: 마지막 재생 결과를 보고 회의할 시간. 관측자는 못 놓고, 모두 준비되면 바로 최종 고발로
+function beginReview(room) {
+  room.phase = 'review';
+  resetReady(room);
+  system(room, '모든 재생이 끝났다. 기록을 정리하고 고발을 준비하라.');
+  armTimer(room, REVIEW_SECONDS * 1000, () => startVote(room, 'final', null));
+  broadcast(room);
 }
 
 function startVote(room, kind, proposer) {
@@ -290,7 +305,7 @@ function startVote(room, kind, proposer) {
   room.phase = 'vote';
   openVote(g, kind, proposer?.key ?? null, null);
   if (kind === 'accuse') system(room, `${proposer.name}님이 고발 투표를 열었다.`);
-  if (kind === 'final') system(room, '모든 재생이 끝났다. 범인을 고발해야 한다.');
+  if (kind === 'final') system(room, '최종 고발 투표가 시작됐다.');
   if (kind === 'unmask') system(room, '범인을 맞혔다. 이제 교수를 찾아라.');
   armTimer(room, VOTE_SECONDS * 1000, () => finishVote(room));
   broadcast(room);
@@ -344,6 +359,7 @@ function checkAllReady(room) {
   if (!people.length || !people.every((p) => p.ready)) return false;
   if (room.phase === 'briefing') beginPlan(room);
   else if (room.phase === 'plan') endPlan(room);
+  else if (room.phase === 'review') startVote(room, 'final', null);
   return true;
 }
 
@@ -451,7 +467,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('ready', (value) => {
-    if (!room || (room.phase !== 'briefing' && room.phase !== 'plan')) return;
+    if (!room || !['briefing', 'plan', 'review'].includes(room.phase)) return;
     player.ready = value !== false;
     if (!checkAllReady(room)) broadcast(room);
   });
@@ -527,7 +543,7 @@ io.on('connection', (socket) => {
           else broadcast(r);
         }
       }, 15000);
-    } else if (r.phase === 'plan' || r.phase === 'briefing') {
+    } else if (['plan', 'briefing', 'review'].includes(r.phase)) {
       checkAllReady(r);
     } else if (r.phase === 'vote' && r.game?.vote && connected(r).length && connected(r).every((p) => r.game.vote.choices.has(p.key))) {
       finishVote(r);

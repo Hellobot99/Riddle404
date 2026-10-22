@@ -37,7 +37,7 @@ const MOD_TEXT = {
 const LEVEL_NAME = { 1: '기본', 2: '공범', 3: '정전', 4: '잠긴 문', 5: '이중 위조' };
 
 const SCREENS = ['lobby', 'room', 'loading', 'briefing', 'game', 'result'];
-const PHASE_SCREEN = { waiting: 'room', preparing: 'loading', briefing: 'briefing', plan: 'game', vote: 'game', result: 'result' };
+const PHASE_SCREEN = { waiting: 'room', preparing: 'loading', briefing: 'briefing', plan: 'game', review: 'game', vote: 'game', result: 'result' };
 
 // ---------- 로비 ----------
 
@@ -156,6 +156,7 @@ function musicScene(s) {
   if (!s) return 'lobby';
   if (s.phase === 'briefing') return 'briefing';
   if (s.phase === 'plan') return s.loop > s.loops - 3 ? 'investigate-late' : 'investigate';
+  if (s.phase === 'review') return 'investigate-late';
   if (s.phase === 'vote') return 'vote';
   if (s.phase === 'result') return s.result?.outcome?.detectivesWin ? 'reveal' : 'fail';
   return 'lobby';
@@ -214,7 +215,7 @@ function remaining() {
 function tickTimers() {
   const left = remaining();
   const text = left === null ? '' : `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
-  for (const id of ['#brief-timer', '#hud-timer', '#vote-timer']) {
+  for (const id of ['#brief-timer', '#hud-timer', '#vote-timer', '#vote-bar-timer']) {
     const el = $(id);
     el.textContent = text;
     el.classList.toggle('urgent', left !== null && left <= 10);
@@ -362,8 +363,13 @@ function renderGame() {
   $('#hud-loop').textContent = `${state.loop}/${state.loops}`;
   $('#hud-quota').innerHTML = `<span class="on">${'●'.repeat(me.placed)}</span>${'○'.repeat(Math.max(0, me.quota - me.placed))}`;
   $('#hud-quota').title = `이번 루프 ${me.quota}개 중 ${me.placed}개 배치`;
-  $('#btn-plan-ready').hidden = !planning;
-  $('#btn-plan-ready').textContent = state.me.ready ? '확정 취소' : '배치 확정';
+  // 최종 검토: 관측자는 못 놓고, "고발 준비 완료"를 모두 누르면 최종 고발로 넘어간다
+  const reviewing = state.phase === 'review';
+  $('#btn-plan-ready').hidden = !planning && !reviewing;
+  $('#btn-plan-ready').textContent = reviewing
+    ? (state.me.ready ? '준비 취소' : '고발 준비 완료')
+    : (state.me.ready ? '확정 취소' : '배치 확정');
+  $('#hud-quota').parentElement.hidden = !planning; // 관측자를 놓을 수 있을 때만 보인다
   $('#btn-plan-ready').classList.toggle('ghost', state.me.ready);
   $('#btn-plan-ready').classList.toggle('primary', !state.me.ready);
   $('#btn-propose').hidden = !planning;
@@ -602,7 +608,7 @@ $('#btn-secret').onclick = () => {
 };
 // ← → 키로 시간을 옮긴다 (입력창에 쓰는 중이면 무시)
 document.addEventListener('keydown', (e) => {
-  if (!state || PHASE_SCREEN[state.phase] !== 'game' || state.phase !== 'plan') return;
+  if (!state || !['plan', 'review'].includes(state.phase)) return;
   if (e.target.closest('input, textarea')) return;
   if (e.key === 'ArrowLeft') setViewTime(viewTime - 1);
   if (e.key === 'ArrowRight') setViewTime(viewTime + 1);
@@ -662,7 +668,12 @@ function renderNote() {
   if (c.level > 1) html += `<div class="step"><p class="step-head"><span class="num">!</span> 이번 사건의 규칙</p>${ruleNotes(false)}</div>`;
   html += `<div class="step"><p class="step-head"><span class="num">3</span> 추리 방법</p>
     <p class="small muted">범인은 범행 시각 자기 기록을 아무도 없는 방으로 위조했어요. 사람은 30분에 통로로 이어진 옆방까지만 움직여요. 30분 만에 갈 수 없는 방에 찍힌 사람을 찾아 상단의 <b>고발</b>로 투표를 여세요.</p>
+    <p class="small muted"><b>보너스</b> · 범행 수단은 범인이 범행 30분 전후에 다루던 <b>물건</b>이에요. <b>동기 단서</b>는 범인이 범행 <b>1시간 전이나 1시간 뒤</b>에 있던 방에 남아 있어요.</p>
   </div>`;
+  if (state.phase === 'review') {
+    html = `<div class="step done"><p class="step-head"><span class="num">⏱</span> 최종 검토</p>
+      <p class="small">모든 재생이 끝났어요. 기록을 정리하고 범인·수단·동기를 정하세요. 모두 <b>고발 준비 완료</b>를 누르거나 시간이 다 되면 최종 고발 투표가 열려요.</p></div>` + html;
+  }
   $('#pane-note').innerHTML = html;
 }
 
@@ -703,7 +714,11 @@ function renderRecord() {
       html += o.events.map((ev) => `<p class="event">◆ ${esc(ev.text)}</p>`).join('');
     } else {
       html += `<p>${o.present.length ? o.present.map((s) => `${chip(s)} ${esc(susName(s))}${people.has(`${s}:${time}`) ? ' <span class="red small">같은 시각 다른 곳에서도 보임</span>' : ''}`).join('<br>') : '<span class="muted">아무도 없었다.</span>'}</p>`;
-      html += o.events.map((ev) => `<p class="event${ev.clue ? ' clue' : ''}">◆ ${esc(ev.text)}${ev.clue ? ' <span class="tag">현장 쪽 소리</span>' : ''}</p>`).join('');
+      const TAG = { item: '물건', motive: '동기 단서' };
+      html += o.events.map((ev) => {
+        const tag = ev.clue ? '현장 쪽 소리' : TAG[ev.tag];
+        return `<p class="event${ev.clue ? ' clue' : ''}${ev.tag ? ` ${ev.tag}` : ''}">◆ ${esc(ev.text)}${tag ? ` <span class="tag">${tag}</span>` : ''}</p>`;
+      }).join('');
     }
     html += '</div>';
   }
@@ -775,9 +790,16 @@ function renderRoutes() {
 // 고발 투표에서 고르는 중인 표. 범인을 고르기 전에는 수단·동기만 기억해 두고, 범인을 고르면 함께 보낸다
 let voteDraft = null;
 
+// 투표 중에도 지도와 기록을 볼 수 있게 투표 창을 접을 수 있다
+let voteCollapsed = false;
+let voteKind = null;
+
 function renderVote() {
   const v = state.phase === 'vote' ? state.vote : null;
-  $('#vote').hidden = !v;
+  if (v?.kind !== voteKind) voteCollapsed = false; // 새 투표가 열리면 다시 펼친다
+  voteKind = v?.kind ?? null;
+  $('#vote').hidden = !v || voteCollapsed;
+  $('#vote-bar').hidden = !v || !voteCollapsed;
   if (!v) {
     voteDraft = null;
     return;
@@ -813,6 +835,15 @@ function renderVote() {
   const total = state.players.filter((p) => p.connected).length;
   $('#vote-status').textContent = `투표 ${v.voted.length}/${total}${v.voted.length ? ` · ${v.voted.join(', ')}` : ''} · 다시 누르면 표를 바꿀 수 있어요`;
 }
+
+$('#btn-vote-collapse').onclick = () => {
+  voteCollapsed = true;
+  renderVote();
+};
+$('#btn-vote-expand').onclick = () => {
+  voteCollapsed = false;
+  renderVote();
+};
 
 $('#vote-options').addEventListener('click', (e) => {
   const u = e.target.closest('[data-unmask]');

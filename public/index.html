@@ -105,7 +105,7 @@
           <ol class="steps">
             <li><b>소리 찾기</b> · 노란 추정 시간대에서 <span class="amber">◆ 현장 쪽 소리</span>를 찾는다. 소리는 두 시각에 나고, 하나는 범행과 무관하다.</li>
             <li><b>알리바이 검증</b> · 범인은 범행 시각 자기 기록을 <b>아무도 없는 방</b>으로 위조했다. 그 시각에 혼자 찍힌 사람의 30분 전후 위치를 확인한다. 사람은 30분에 <b>통로로 이어진 옆방</b>까지만 움직이고, 함께 찍힌 사람은 서로의 증인이다.</li>
-            <li><b>고발</b> · 30분 만에 갈 수 없는 방에 찍힌 사람이 기록을 위조한 범인이다. 범인이 다루던 <b>물건</b>(범행 수단)과 어딘가 남은 <b>동기 단서</b>까지 맞히면 보너스 점수.</li>
+            <li><b>고발</b> · 30분 만에 갈 수 없는 방에 찍힌 사람이 기록을 위조한 범인이다. 보너스: 범인이 범행 30분 전후에 다루던 <b>물건</b>이 범행 수단이고, 범인이 범행 <b>1시간 전이나 1시간 뒤</b>에 있던 방에 <b>동기 단서</b>가 남아 있다.</li>
           </ol>
           <p class="small muted">현장에 있던 사람은 누구든 기록에 남지 않는다. 범인도 범행 전후에 현장에 머물렀다면 그 시각엔 보이지 않고, 범인이 아닌 사람도 밤중에 현장에 들를 수 있다. 안 보인다고 범인은 아니지만, 방을 모두 봤는데 없다면 그때 현장에 있었던 것이다.</p>
         </div>
@@ -214,13 +214,22 @@
     <div class="modal-box">
       <div class="phase-head">
         <p class="kicker" id="vote-kicker"></p>
-        <span class="timer" id="vote-timer"></span>
+        <span class="vote-tools">
+          <span class="timer" id="vote-timer"></span>
+          <button id="btn-vote-collapse" class="btn ghost sm" type="button">지도 보기</button>
+        </span>
       </div>
       <h3 id="vote-title"></h3>
       <p id="vote-desc" class="muted"></p>
       <div id="vote-options" class="vote-options"></div>
       <p id="vote-status" class="muted small"></p>
     </div>
+  </div>
+
+  <!-- 접힌 투표 창: 지도를 보다가 다시 펼친다 -->
+  <div id="vote-bar" class="vote-bar" hidden>
+    <span>투표 중 <span class="timer" id="vote-bar-timer"></span></span>
+    <button id="btn-vote-expand" class="btn primary sm" type="button">투표로 돌아가기</button>
   </div>
 
   <div id="toast" class="toast" hidden></div>

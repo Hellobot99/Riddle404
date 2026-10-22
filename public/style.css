@@ -532,3 +532,15 @@ body.in-game .music-toggle.blocked span { display: inline; }
 .switch i { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--muted); transition: left 0.15s, background 0.15s; }
 .switch[aria-checked="true"] { background: var(--accent-soft); border-color: var(--accent); }
 .switch[aria-checked="true"] i { left: 18px; background: var(--accent); }
+
+/* 투표 창 접기 */
+.vote-tools { display: inline-flex; align-items: center; gap: 10px; }
+.vote-bar {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 12;
+  display: flex; align-items: center; gap: 12px;
+  background: var(--panel); border: 1px solid var(--red); border-radius: 999px; padding: 6px 8px 6px 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); font-size: 14px;
+}
+.vote-bar[hidden] { display: none; }
+.event.motive { color: var(--accent); }
+.event.item .tag, .event.motive .tag { opacity: 0.8; }
